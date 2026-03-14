@@ -1,18 +1,18 @@
 import pandas as pd
-import joblib
 import seaborn as sns
 import matplotlib.pyplot as plt
+
 from sklearn.model_selection import train_test_split
 from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
-from sklearn.naive_bayes import MultinomialNB
-from sklearn.svm import LinearSVC
-from sklearn.ensemble import VotingClassifier
-from sklearn.metrics import accuracy_score, classification_report, confusion_matrix
 
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier, AdaBoostClassifier
+from xgboost import XGBClassifier
+
+from sklearn.metrics import accuracy_score, classification_report
 
 
 df = pd.read_csv("preprocessed_city_reviews.csv")
+
 
 df["sentiment"] = df["Rating"].apply(lambda x: 1 if x >= 4 else 0)
 
@@ -25,49 +25,30 @@ X_train, X_test, y_train, y_test = train_test_split(
 )
 
 
-vectorizer = TfidfVectorizer(max_features=5000, ngram_range=(1,2))
+vectorizer = TfidfVectorizer(max_features=5000, ngram_range=(1,2), stop_words="english")
 X_train_vec = vectorizer.fit_transform(X_train)
 X_test_vec = vectorizer.transform(X_test)
 
 
-lr = LogisticRegression(max_iter=500)
-nb = MultinomialNB()
-svm = LinearSVC()
-
-ensemble_model = VotingClassifier(
-    estimators=[
-        ('lr', lr),
-        ('nb', nb),
-        ('svm', svm)
-    ],
-    voting='hard'
-)
+models = {
+    "Random Forest": RandomForestClassifier(n_estimators=200, random_state=42, n_jobs=-1),
+    "Gradient Boosting": GradientBoostingClassifier(),
+    "AdaBoost": AdaBoostClassifier(),
+    "XGBoost": XGBClassifier(use_label_encoder=False, eval_metric="logloss")
+}
 
 
-ensemble_model.fit(X_train_vec, y_train)
+for name, model in models.items():
 
+    model.fit(X_train_vec, y_train)
 
-y_pred = ensemble_model.predict(X_test_vec)
+    y_pred = model.predict(X_test_vec)
 
-accuracy = accuracy_score(y_test, y_pred)
+    acc = accuracy_score(y_test, y_pred)
 
-print("Accuracy:", accuracy)
-print("\nClassification Report:\n")
-print(classification_report(y_test, y_pred))
-
-cm = confusion_matrix(y_test, y_pred)
-
-plt.figure(figsize=(5,4))
-sns.heatmap(cm, annot=True, fmt="d", cmap="Blues")
-plt.title("Confusion Matrix")
-plt.xlabel("Predicted")
-plt.ylabel("Actual")
-plt.show()
-
-
-
-
-
+    print("Accuracy:", acc)
+    print("\nClassification Report:")
+    print(classification_report(y_test, y_pred))
 
 while True:
 
@@ -77,9 +58,9 @@ while True:
         break
 
     review_vec = vectorizer.transform([review])
-    prediction = ensemble_model.predict(review_vec)[0]
+    prediction = models.predict(review_vec)[0]
 
     if prediction == 1:
-        print("Sentiment: Positive Review")
+        print("Positive")
     else:
-        print("Sentiment: Negative Review")
+        print("Negative")
